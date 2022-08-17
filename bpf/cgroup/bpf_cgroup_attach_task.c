@@ -22,7 +22,6 @@ tg_tp_cgrp_attach_task(struct bpf_raw_tracepoint_args *ctx)
 	int level, zero = 0;
 	uint64_t cgrpid;
 	uint32_t pid, nspid, tgid;
-	char *path;
 	struct cgroup *cgrp;
 	struct tetragon_conf *config;
 	struct cgroup_tracking_value *cgrp_heap;
@@ -40,7 +39,6 @@ tg_tp_cgrp_attach_task(struct bpf_raw_tracepoint_args *ctx)
 		return 0;
 
 	cgrp = (struct cgroup *)ctx->args[0];
-	path = (char *)ctx->args[1];
 	task = (struct task_struct *)ctx->args[2];
 
 	pid = get_current_pid_tgid() >> 32;

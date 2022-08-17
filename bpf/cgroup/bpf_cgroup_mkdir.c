@@ -21,7 +21,6 @@ tg_tp_cgrp_mkdir(struct bpf_raw_tracepoint_args *ctx)
 	pid_t pid;
 	int level, zero = 0;
 	uint64_t cgrpid;
-	char *path;
 	struct cgroup *cgrp;
 	struct cgroup_tracking_value *cgrp_heap;
 	struct tetragon_conf *config;
@@ -32,7 +31,6 @@ tg_tp_cgrp_mkdir(struct bpf_raw_tracepoint_args *ctx)
 		return 0;
 
 	cgrp = (struct cgroup *)ctx->args[0];
-	path = (char *)ctx->args[1];
 
 	task = (struct task_struct *)get_current_task();
 	probe_read(&pid, sizeof(pid), _(&task->tgid));
