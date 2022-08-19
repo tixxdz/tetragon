@@ -23,10 +23,29 @@
 #define KN_NAME_LENGTH 128
 
 /* Max nested cgroups that are tracked. Arbitrary value, nested cgroups
- * that are at a level greater than 32 will be attached to the cgroup
+ * that are at a level deeper than 32 will be tracked to the cgroup
  * at level 32.
  */
 #define CGROUP_MAX_NESTED_LEVEL 32
+
+/* Do not use CGROUP_SUBSYS_COUNT from our vmlinux.h as it does not
+ * compile some controllers.
+ * At vanilla kernel version v5.18.18 CGROUP_SUBSYS_COUNT==15
+ * So for safety and to be able to support different setups, let's
+ * define our MAX_CGROUP_SUBSYS_COUNT based on vanilla kernels.
+ *
+ * We are interested only in the cpuset, memory or pids controllers
+ * which are indexed at 0, 4 and 11 respectively per kernel v5.18.18
+ * assuming all controllers are compiled in. Of course when we use
+ * the controllers indexes we will first discover these indexes
+ * dynamically in user space which will work on all setups from reading
+ * file: /proc/cgroups
+ *
+ * Newer controllers should be appended at the end, controllers that
+ * are not upstreamed can provoke errors here, so let's just add 5
+ * as an arbitrary margin value in case they happen to be between.
+ */
+#define MAX_CGROUP_SUBSYS_COUNT 20
 
 typedef enum
 {
@@ -136,7 +155,7 @@ get_cgroup_hierarchy_id(const struct cgroup *cgrp)
 }
 
 static inline __attribute__((always_inline)) struct cgroup *
-get_task_cgroup(struct task_struct *task)
+get_task_cgroup(struct task_struct *task, __u32 subsys_idx)
 {
 	struct cgroup_subsys_state *subsys;
 	struct css_set *cgroups;
@@ -146,7 +165,17 @@ get_task_cgroup(struct task_struct *task)
 	if (unlikely(!cgroups))
 		return cgrp;
 
-	probe_read(&subsys, sizeof(subsys), _(&cgroups->subsys[0]));
+	/* Error out in case index is larger than what we assume */
+	if (unlikely(subsys_idx >= MAX_CGROUP_SUBSYS_COUNT))
+		return cgrp;
+
+	/* Read css from the passed subsys index to ensure that we operate
+	 * on the desired controller. This allows user space to be flexible
+	 * and chose the right per cgroup subsystem to use in order to
+	 * support as much as workload as possible. It also reduces errors
+	 * in a significant way.
+	 */
+	probe_read(&subsys, sizeof(subsys), _(&cgroups->subsys[subsys_idx]));
 	if (unlikely(!subsys))
 		return cgrp;
 
@@ -173,12 +202,12 @@ get_cgroup_id(const struct cgroup *cgrp)
 }
 
 static inline __attribute__((always_inline)) __u64
-get_task_cgroup_id(struct task_struct *task)
+get_task_cgroup_id(struct task_struct *task, __u32 subsys_idx)
 {
 	__u64 cgrpid = 0;
 	struct cgroup *cgrp;
 
-	cgrp = get_task_cgroup(task);
+	cgrp = get_task_cgroup(task, subsys_idx);
 	if (cgrp)
 		cgrpid = get_cgroup_id(cgrp);
 
@@ -280,7 +309,7 @@ __set_task_cgrpid_tracker(struct tetragon_conf *conf, struct task_struct *task,
 	if (execve_val->cgrpid_tracker != 0)
 		return 0;
 
-	cgrp = get_task_cgroup(task);
+	cgrp = get_task_cgroup(task, conf->tg_cgrp_hierarchy_idx);
 	level = get_cgroup_level(cgrp);
 
 	if (level <= conf->tg_cgrp_level) {
