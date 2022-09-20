@@ -34,6 +34,38 @@ var (
 		"tracepoint",
 	)
 
+	CgroupMkdir = program.Builder(
+		"bpf_cgroup_mkdir.o",
+		"cgroup/cgroup_mkdir",
+		"raw_tracepoint/cgroup_mkdir",
+		"tg_tp_cgrp_mkdir",
+		"raw_tracepoint",
+	)
+
+	CgroupRmdir = program.Builder(
+		"bpf_cgroup_rmdir.o",
+		"cgroup/cgroup_rmdir",
+		"raw_tracepoint/cgroup_rmdir",
+		"tg_tp_cgrp_rmdir",
+		"raw_tracepoint",
+	)
+
+	CgroupRelease = program.Builder(
+		"bpf_cgroup_release.o",
+		"cgroup/cgroup_release",
+		"raw_tracepoint/cgroup_release",
+		"tg_tp_cgrp_release",
+		"raw_tracepoint",
+	)
+
+	CgroupAttachTask = program.Builder(
+		"bpf_cgroup_attach_task.o",
+		"cgroup/cgroup_attach_task",
+		"raw_tracepoint/cgroup_attach_task",
+		"tg_tp_cgrp_attach_task",
+		"raw_tracepoint",
+	)
+
 	Fork = program.Builder(
 		"bpf_fork.o",
 		"wake_up_new_task",
@@ -49,6 +81,10 @@ var (
 	/* Networking and Process Monitoring maps */
 	ExecveMap    = program.MapBuilder("execve_map", Execve)
 	ExecveMapV53 = program.MapBuilder("execve_map", ExecveV53)
+
+	/* Cgroup tracking maps */
+	CgroupsTrackingMap    = program.MapBuilder("tg_cgrps_tracking_map", CgroupAttachTask)
+	CgroupsTrackingMapV53 = program.MapBuilder("tg_cgrps_tracking_map", CgroupAttachTask)
 
 	/* Policy maps populated from base programs */
 	NamesMap    = program.MapBuilder("names_map", Execve)
@@ -70,6 +106,13 @@ func GetExecveMap() *program.Map {
 	return ExecveMap
 }
 
+func GetCgroupsTrackingMap() *program.Map {
+	if kernels.EnableLargeProgs() {
+		return CgroupsTrackingMapV53
+	}
+	return CgroupsTrackingMap
+}
+
 func GetTetragonConfMap() *program.Map {
 	if kernels.EnableLargeProgs() {
 		return TetragonConfMapV53
@@ -81,6 +124,10 @@ func GetDefaultPrograms() []*program.Program {
 	progs := []*program.Program{
 		Exit,
 		Fork,
+		CgroupAttachTask,
+		CgroupMkdir,
+		CgroupRmdir,
+		CgroupRelease,
 	}
 	if kernels.EnableLargeProgs() {
 		progs = append(progs, ExecveV53)
@@ -100,6 +147,7 @@ func GetDefaultMaps() []*program.Map {
 			NamesMapV53,
 			TCPMonMapV53,
 			TetragonConfMapV53,
+			CgroupsTrackingMapV53,
 		)
 	} else {
 		maps = append(maps,
@@ -108,6 +156,7 @@ func GetDefaultMaps() []*program.Map {
 			NamesMap,
 			TCPMonMap,
 			TetragonConfMap,
+			CgroupsTrackingMap,
 		)
 	}
 	return maps
